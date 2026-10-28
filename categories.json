@@ -1,0 +1,210 @@
+{
+  "_说明": "插件分类规则。改这里就能改分类，不用动代码。score 越高越优先。",
+  "_版本": 1,
+  "categories": [
+    {
+      "id": "memory",
+      "name": "记忆与知识",
+      "icon": "brain",
+      "color": "#a78bfa",
+      "desc": "长期记忆、知识库、认知图",
+      "keywords": {
+        "记忆": 5,
+        "memory": 5,
+        "mnemon": 5,
+        "灵枢": 5,
+        "认知": 4,
+        "知识库": 4,
+        "knowledge": 4,
+        "recall": 3,
+        "remember": 3,
+        "长期记忆": 5
+      }
+    },
+    {
+      "id": "ui",
+      "name": "界面与外观",
+      "icon": "layout",
+      "color": "#22d3ee",
+      "desc": "侧栏、面板、主题、悬浮控件",
+      "keywords": {
+        "侧栏": 5,
+        "sidebar": 5,
+        "界面": 4,
+        "主题": 4,
+        "theme": 4,
+        "dock": 4,
+        "功能坞": 4,
+        "折叠": 4,
+        "图标": 3,
+        "面板": 3,
+        "外观": 4,
+        "ui": 2
+      }
+    },
+    {
+      "id": "code",
+      "name": "文件与代码",
+      "icon": "code",
+      "color": "#60a5fa",
+      "desc": "文件读写、代码审查、Git、技能",
+      "keywords": {
+        "文件": 4,
+        "file": 4,
+        "代码": 4,
+        "code": 4,
+        "git": 5,
+        "diff": 4,
+        "审查": 4,
+        "review": 4,
+        "simplify": 4,
+        "编辑": 3,
+        "editor": 3,
+        "技能": 3,
+        "skill": 3,
+        "cad": 4,
+        "dwg": 4
+      }
+    },
+    {
+      "id": "search",
+      "name": "搜索与获取",
+      "icon": "search",
+      "color": "#34d399",
+      "desc": "联网搜索、插件市场、资源获取",
+      "keywords": {
+        "搜索": 6,
+        "search": 6,
+        "联网": 6,
+        "抓取": 5,
+        "浏览器": 5,
+        "browser": 5,
+        "爬": 5,
+        "市场": 4,
+        "market": 5,
+        "web": 3
+      }
+    },
+    {
+      "id": "model",
+      "name": "模型与成本",
+      "icon": "cpu",
+      "color": "#fbbf24",
+      "desc": "模型接入、费用统计、余额",
+      "keywords": {
+        "成本": 6,
+        "费用": 6,
+        "cost": 6,
+        "计费": 6,
+        "余额": 5,
+        "token": 5,
+        "供应商": 5,
+        "provider": 4,
+        "模型": 5,
+        "model": 3,
+        "价格": 5
+      }
+    },
+    {
+      "id": "remote",
+      "name": "通信与远程",
+      "icon": "wifi",
+      "color": "#fb7185",
+      "desc": "手机访问、群聊房间、Agent 协作",
+      "keywords": {
+        "远程": 6,
+        "remote": 5,
+        "手机": 6,
+        "扫码": 5,
+        "ssh": 6,
+        "隧道": 5,
+        "微信": 6,
+        "房间": 5,
+        "room": 5,
+        "群聊": 6,
+        "team": 4,
+        "agent-teams": 5,
+        "消息": 4
+      }
+    },
+    {
+      "id": "doc",
+      "name": "文档与媒体",
+      "icon": "file-text",
+      "color": "#38bdf8",
+      "desc": "Office、图片、视频、音频",
+      "keywords": {
+        "docx": 6,
+        "xlsx": 6,
+        "pptx": 6,
+        "pdf": 6,
+        "office": 6,
+        "univer": 5,
+        "图片": 5,
+        "image": 4,
+        "视频": 6,
+        "video": 6,
+        "语音": 6,
+        "音频": 6,
+        "表格": 4,
+        "文档": 4,
+        "图表": 4,
+        "架构图": 5
+      }
+    },
+    {
+      "id": "safety",
+      "name": "系统与安全",
+      "icon": "shield",
+      "color": "#94a3b8",
+      "desc": "命令拦截、运行时守护、安全",
+      "keywords": {
+        "安全": 6,
+        "safety": 6,
+        "拦截": 6,
+        "破坏性": 6,
+        "守护": 5,
+        "guard": 5,
+        "shell": 5,
+        "运行时": 4,
+        "runtime": 4,
+        "命令": 4
+      }
+    },
+    {
+      "id": "session",
+      "name": "会话与回滚",
+      "icon": "history",
+      "color": "#c084fc",
+      "desc": "会话管理、归档、撤回重来",
+      "keywords": {
+        "回滚": 6,
+        "撤回": 6,
+        "retrace": 6,
+        "归档": 5,
+        "archive": 5,
+        "回收站": 5,
+        "会话": 4,
+        "session": 4,
+        "历史": 3,
+        "purge": 3
+      }
+    },
+    {
+      "id": "other",
+      "name": "其他",
+      "icon": "box",
+      "color": "#64748b",
+      "desc": "暂未归类的",
+      "keywords": {}
+    }
+  ],
+  "_手动指定": "优先级最高。键=包名，值=分类 id",
+  "overrides": {
+    "dsh-mcp-connector": "code",
+    "@deepseek-ai/schemastery": "other",
+    "@local/dsh-elec-quote-preset": "code",
+    "dsh-genui": "ui",
+    "dsh-dock": "model"
+  }
+}
