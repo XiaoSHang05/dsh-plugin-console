@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="abyss">
+<head>
+<meta charset="UTF-8">
+<title>插件管家</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="bg-grid"></div>
+<div class="bg-glow bg-glow-1"></div>
+<div class="bg-glow bg-glow-2"></div>
+
+<!-- 顶部 -->
+<header class="topbar">
+  <div class="brand">
+    <svg class="logo" viewBox="0 0 24 24" fill="none">
+      <path d="M12 2L3 7v10l9 5 9-5V7l-9-5z" stroke="currentColor" stroke-width="1.4"/>
+      <path d="M12 7l-5 2.8v5.4L12 18l5-2.8V9.8L12 7z" stroke="currentColor" stroke-width="1.1" opacity=".5"/>
+      <circle cx="12" cy="12" r="1.5" fill="currentColor"/>
+    </svg>
+    <span class="brand-name">插件管家</span>
+    <span class="brand-sub">PLUGIN CONSOLE</span>
+  </div>
+
+  <div class="top-right">
+    <div class="status-chip" id="dshStatus">
+      <span class="dot"></span>
+      <span class="txt">连接中…</span>
+    </div>
+    <button class="theme-btn" id="btnTheme" title="换个主题">
+      <svg viewBox="0 0 16 16" fill="none">
+        <circle cx="8" cy="8" r="5.6" stroke="currentColor" stroke-width="1.3"/>
+        <path d="M8 2.4a5.6 5.6 0 0 1 0 11.2z" fill="currentColor" opacity=".55"/>
+      </svg>
+    </button>
+  </div>
+</header>
+
+<!-- 标签页 -->
+<div class="tabs">
+  <button class="tab active" data-tab="update">
+    更新与卸载
+    <span class="cnt" id="cntUpdate">—</span>
+  </button>
+  <button class="tab" data-tab="list">
+    已装插件一览
+    <span class="cnt" id="cntAll">—</span>
+  </button>
+</div>
+
+<!-- ============ 页：更新与卸载 ============ -->
+<div class="page" id="pageUpdate" style="display:flex;flex-direction:column;flex:1 1 auto;min-height:0;">
+
+  <section class="toolbar">
+    <div class="tb-left">
+      <button class="btn btn-primary" id="btnScan">
+        <svg class="ico" viewBox="0 0 16 16"><path d="M8 2v3M8 11v3M2 8h3M11 8h3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="8" cy="8" r="2.6" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+        <span>检查更新</span>
+      </button>
+      <button class="btn" id="btnUpdate" disabled>
+        <svg class="ico" viewBox="0 0 16 16"><path d="M8 11V3M5 6l3-3 3 3M3 12.5h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span>升级选中</span>
+        <span class="badge" id="selCount" hidden>0</span>
+      </button>
+      <button class="btn btn-ghost" id="btnUninstall" disabled>
+        <svg class="ico" viewBox="0 0 16 16"><path d="M3.5 4.5h9M6 4.5V3h4v1.5M5 4.5l.6 8.5h4.8l.6-8.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span>卸载选中</span>
+      </button>
+    </div>
+
+    <div class="tb-right">
+      <div class="filter-group" id="filterGroup">
+        <button class="fg active" data-f="all">全部</button>
+        <button class="fg" data-f="update">可更新</button>
+        <button class="fg" data-f="ok">已最新</button>
+        <button class="fg" data-f="local">其他</button>
+      </div>
+      <button class="icon-btn" id="btnRollback" title="从备份回滚">
+        <svg viewBox="0 0 16 16"><path d="M3 8a5 5 0 1 1 1.5 3.5" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/><path d="M3 4v4h4" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+    </div>
+  </section>
+
+  <main class="list-wrap">
+    <div class="list-head">
+      <label class="cb-wrap">
+        <input type="checkbox" id="cbAll">
+        <span class="cb"></span>
+      </label>
+      <div>插件</div>
+      <div>版本</div>
+      <div>作用 / 更新内容</div>
+    </div>
+    <div class="list-body" id="listBody">
+      <div class="empty">
+        <div class="empty-ico">
+          <svg viewBox="0 0 48 48" fill="none">
+            <path d="M24 6L6 15v18l18 9 18-9V15L24 6z" stroke="currentColor" stroke-width="1.6"/>
+            <path d="M24 16l-9 4.5v9L24 34l9-4.5v-9L24 16z" stroke="currentColor" stroke-width="1.2" opacity=".4"/>
+          </svg>
+        </div>
+        <div class="empty-t">点「检查更新」开始</div>
+        <div class="empty-s">会逐个向你已装的插件查询云端最新版</div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- ============ 页：已装插件一览 ============ -->
+<div class="page" id="pageList" style="display:none;flex-direction:column;flex:1 1 auto;min-height:0;">
+
+  <div class="inst-toolbar">
+    <input class="inst-search" id="instSearch" type="text" placeholder="搜插件名或说明…">
+    <span class="inst-count" id="instCount">—</span>
+  </div>
+
+  <main class="list-wrap">
+    <div class="list-body" id="instBody">
+      <div class="empty">
+        <div class="empty-t">点上面的「已装插件一览」刷新</div>
+        <div class="empty-s">会列出这台机器上装的全部插件和它们的作用</div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- 底部 -->
+<footer class="footer">
+  <div class="progress-bar" id="progWrap" hidden>
+    <div class="prog-track"><div class="prog-fill" id="progFill"></div></div>
+    <div class="prog-text" id="progText"></div>
+  </div>
+
+  <div class="footer-row">
+    <button class="log-toggle" id="logToggle">
+      <svg viewBox="0 0 16 16" class="chev"><path d="M5 3l5 5-5 5" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span>运行日志</span>
+      <span class="log-dot" id="logDot" hidden></span>
+    </button>
+    <div class="footer-stats" id="footerStats">—</div>
+  </div>
+
+  <div class="log-drawer" id="logDrawer">
+    <pre id="logBox"></pre>
+  </div>
+</footer>
+
+<!-- 回滚弹窗 -->
+<div class="modal-mask" id="modalMask" hidden>
+  <div class="modal">
+    <div class="modal-h">
+      <span>从备份回滚</span>
+      <button class="modal-close" id="modalClose">
+        <svg viewBox="0 0 12 12"><path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" stroke-width="1.3"/></svg>
+      </button>
+    </div>
+    <div class="modal-b" id="modalBody"></div>
+  </div>
+</div>
+
+<!-- 主题弹窗 -->
+<div class="modal-mask" id="themeMask" hidden>
+  <div class="modal wide">
+    <div class="modal-h">
+      <span>换个主题</span>
+      <button class="modal-close" id="themeClose">
+        <svg viewBox="0 0 12 12"><path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" stroke-width="1.3"/></svg>
+      </button>
+    </div>
+    <div class="modal-b">
+      <div class="theme-grid" id="themeGrid"></div>
+      <div style="margin-top:14px;font-size:10.5px;color:var(--t3);line-height:1.7;">
+        选完立刻生效，会自动记住。下次打开还是这套。
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
