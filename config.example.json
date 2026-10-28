@@ -1,0 +1,22 @@
+{
+  "_说明": "插件管家配置模板。复制成 config.json 后填自己的路径。留 null 的项会自动探测。",
+  "_版本": 1,
+
+  "profile": null,
+  "_profile说明": "DSH 的 profile 目录。null = 自动找 ~/.dsh/profiles/desktop，找不到就用 profiles 下第一个有 package.json 的",
+
+  "dshRoots": null,
+  "_dshRoots说明": "DSH 安装目录候选列表。null = 自动从常见位置探测",
+
+  "backupRoot": null,
+  "_backupRoot说明": "备份放哪。null = 放在本程序目录下的 _backups",
+
+  "ledgerPath": null,
+  "_ledgerPath说明": "DSH插件台账.md 的路径。null = 不启用台账同步（默认就是 null，普通用户不需要）",
+
+  "registry": "https://registry.npmmirror.com",
+  "_registry说明": "npm 源。国内建议 npmmirror，国外可用 https://registry.npmjs.org",
+
+  "keepBackups": 3,
+  "_keepBackups说明": "每类备份最多保留几份"
+}
