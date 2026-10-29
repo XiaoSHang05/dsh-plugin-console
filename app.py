@@ -69,6 +69,16 @@ class Api:
             "ver": backend.dsh_version(backend.find_dsh_root()),
         }
 
+    def debug_eval(self, js):
+        """调试用：在窗口里执行任意 JS（只在 dev 模式可用）"""
+        if not os.environ.get("PMC_DEV"):
+            return {"ok": False, "error": "需要 PMC_DEV=1"}
+        try:
+            r = self._win.evaluate_js(js)
+            return {"ok": True, "result": r}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
     # ---------------- 扫描
     def scan(self):
         try:
