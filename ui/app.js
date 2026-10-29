@@ -433,9 +433,16 @@ async function doScan() {
     S.rows = r.rows || [];
     setStatusChip(r.dshRunning || 0, r.dshVer || null);
     progress(false);
+
+    // ★ 自动勾选所有「可更新」的插件 —— 检查完就能直接点升级，不用手动全选
+    S.selected.clear();
+    for (const row of S.rows) {
+      if (row.verdict === 'UPDATE') S.selected.add(row.name);
+    }
+
     render();
     const upd = S.rows.filter(x => x.verdict === 'UPDATE').length;
-    log(`扫描完成：共 ${S.rows.length} 个，可更新 ${upd} 个`);
+    log(`扫描完成：共 ${S.rows.length} 个，可更新 ${upd} 个` + (upd > 0 ? `（已自动勾选）` : ''));
     if ((r.dshRunning || 0) > 0 && upd > 0) {
       showHint(`DSH 正在运行（${r.dshRunning} 个进程），现在不能写入。要更新请先彻底退出 DSH（托盘右键 → 退出），再点「检查更新」。`);
     } else hideHint();
@@ -599,7 +606,15 @@ function bind() {
     const list = visibleRows().filter(r => r.verdict !== 'ERR');
     if (e.target.checked) list.forEach(r => S.selected.add(r.name));
     else list.forEach(r => S.selected.delete(r.name));
-    render();
+    // 只同步 DOM 勾选状态，不整页 rebuild（rebuild 会让刚点的 checkbox 状态错乱）
+    document.querySelectorAll('input[data-cb]').forEach(cb => {
+      if (cb.disabled) return;
+      cb.checked = S.selected.has(cb.dataset.cb);
+      cb.closest('.row')?.classList.toggle('is-sel', cb.checked);
+    });
+    syncButtons();
+    syncSelectAll();
+    updateStats();
   };
 
   $$('#filterGroup .fg').forEach(b => {
