@@ -341,6 +341,40 @@ def fetch_latest(name):
         return {"err": str(e)[:70]}
 
 
+def probe_package(name):
+    """查一个 npm 包：存不存在、最新版、是不是 DSH 插件（有 dsh.bundle）"""
+    name = (name or "").strip()
+    if not name:
+        return {"ok": False, "error": "包名为空"}
+    # 允许带版本号：@scope/pkg@1.2.3
+    pkg = name
+    if name.startswith("@"):
+        parts = name.split("@")
+        pkg = "@" + parts[1] if len(parts) >= 2 else name
+    elif "@" in name:
+        pkg = name.split("@")[0]
+
+    url = f"{REGISTRY}/{urllib.parse.quote(pkg, safe='')}/latest"
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "shizhen-plugin-console/1.0"})
+        with urllib.request.urlopen(req, timeout=15) as r:
+            j = json.load(r)
+        return {
+            "ok": True,
+            "name": j.get("name") or pkg,
+            "latest": j.get("version"),
+            "description": str(j.get("description") or "").strip(),
+            "hasBundle": bool((j.get("dsh") or {}).get("bundle")),
+            "dsh": j.get("dsh") or {},
+        }
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            return {"ok": False, "error": "npm 上没有这个包"}
+        return {"ok": False, "error": "HTTP %s" % e.code}
+    except Exception as e:
+        return {"ok": False, "error": str(e)[:80]}
+
+
 # ---------------------------------------------------------------- 主查询
 def scan_all(on_progress=None):
     root = find_dsh_root()
