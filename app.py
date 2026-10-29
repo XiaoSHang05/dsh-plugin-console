@@ -13,8 +13,29 @@ from pathlib import Path
 
 import webview
 
-HERE = Path(__file__).parent
+
+def _app_dir():
+    """打包成 exe 后，资源解压在 sys._MEIPASS；直接跑时用脚本所在目录。
+    注意：配置文件（theme.json / config.json）要写在 exe **旁边**，
+    不能写进 _MEIPASS（那是临时目录，退出就没了）。"""
+    if getattr(sys, "frozen", False):
+        # exe 所在目录（可写）
+        return Path(sys.executable).parent
+    return Path(__file__).resolve().parent
+
+
+def _res_dir():
+    """打包后只读资源在 _MEIPASS，开发和运行时在脚本目录"""
+    meipass = getattr(sys, "_MEIPASS", None)
+    if meipass:
+        return Path(meipass)
+    return Path(__file__).resolve().parent
+
+
+HERE = _app_dir()      # 可写目录（config/theme/backups 都在这）
+RES = _res_dir()       # 只读资源（ui/ icon.ico）
 THEME_FILE = HERE / "theme.json"
+sys.path.insert(0, str(RES))
 sys.path.insert(0, str(HERE))
 
 import backend  # noqa: E402
@@ -130,6 +151,64 @@ class Api:
         except Exception as e:
             return {"ok": False, "error": str(e)}
 
+    # ---------------- 添加插件：查包 / 装包
+    def probe_package(self, name):
+        try:
+            return backend.probe_package(name)
+        except Exception as e:
+            traceback.print_exc()
+            return {"ok": False, "error": str(e)}
+
+    def install_package(self, name):
+        try:
+            n = backend.dsh_process_count()
+            if n > 0:
+                msg = "DSH 正在运行（%d 个进程），先彻底退出再装" % n
+                return {"ok": False, "error": msg, "log": ["✗ " + msg]}
+
+            logs = []
+
+            def on_log(s):
+                logs.append(str(s))
+                self._emit("log", str(s))
+
+            on_log("备份中…")
+            backup = backend.make_backup("install")
+            on_log("  → %s" % backup)
+
+            parked, restore = backend.park_non_registry()
+            if parked:
+                on_log("临时摘出 %d 个本地/git 依赖" % parked)
+
+            on_log("安装中…")
+            backend.run_pnpm(["add", name, "-E"], on_log)
+            restore()
+            if parked:
+                on_log("已放回 %d 个本地/git 依赖" % parked)
+
+            on_log("挂 bundles…")
+            base = name.split("@")[0] if name.startswith("@") else name
+            # 带版本的写法要剥掉版本
+            if "@" in base:
+                base = base.split("@")[0]
+            backend.mount_bundles([base], on_log)
+
+            pj, _, deps, bundles = backend.read_profile()
+            ver = backend.local_version(base)
+            on_log("")
+            on_log("──── 验证 ────")
+            on_log("  版本        : %s" % (ver or "读不到"))
+            on_log("  dependencies: %s" % ("Y" if base in deps else "N"))
+            on_log("  bundles     : %s" % ("Y" if base in bundles else "N"))
+
+            ok = bool(ver) and base in deps and base in bundles
+            if not ok:
+                on_log("✗ 有项没到位")
+            return {"ok": ok, "log": logs}
+        except Exception as e:
+            traceback.print_exc()
+            return {"ok": False, "error": str(e), "log": ["异常：%s" % e]}
+
     # ---------------- 已装插件（分组版）
     def list_installed_grouped(self):
         try:
@@ -212,7 +291,7 @@ def _force_window_icon(title_part="插件管家"):
         from ctypes import wintypes
 
         user32 = ctypes.windll.user32
-        icon_path = str(HERE / "icon.ico")
+        icon_path = str(RES / "icon.ico")
         if not Path(icon_path).exists():
             return
 
@@ -261,7 +340,7 @@ def main():
     _set_app_user_model_id()
 
     api = Api()
-    html = HERE / "ui" / "index.html"
+    html = RES / "ui" / "index.html"
 
     if not html.exists():
         print(f"找不到界面文件：{html}")
@@ -291,7 +370,7 @@ def main():
 
     # icon 参数只给 Windows（WinForms 后端只认 .ico）
     kwargs = {"debug": False}
-    icon_path = HERE / "icon.ico"
+    icon_path = RES / "icon.ico"
     if os.name == "nt" and icon_path.exists():
         kwargs["icon"] = str(icon_path)
 
