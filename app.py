@@ -187,7 +187,79 @@ class Api:
             pass
 
 
+def _set_app_user_model_id():
+    """Windows 任务栏把进程归组到某个 AppID 下。
+    不设的话任务栏图标是 python 的、右键菜单里显示 python。"""
+    if os.name != "nt":
+        return
+    try:
+        import ctypes
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
+            "ShiZhen.PluginConsole.1"
+        )
+    except Exception:
+        pass
+
+
+def _force_window_icon(title_part="插件管家"):
+    """pywebview 的 icon 参数只在 WinForms 后端生效、且时机偏早，
+    某些情况下窗口图标还是 python 默认的那个。
+    这里等窗口出现后，用 Win32 再强设一次（发送 WM_SETICON）。"""
+    if os.name != "nt":
+        return
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        user32 = ctypes.windll.user32
+        icon_path = str(HERE / "icon.ico")
+        if not Path(icon_path).exists():
+            return
+
+        # 载入 ico 的大图标(32x32)和小图标(16x16)
+        IMAGE_ICON = 1
+        LR_LOADFROMFILE = 0x00000010
+        LR_DEFAULTSIZE = 0x00000040
+        WM_SETICON = 0x0080
+        ICON_BIG, ICON_SMALL = 1, 0
+
+        hicon_big = user32.LoadImageW(
+            0, icon_path, IMAGE_ICON, 0, 0, LR_LOADFROMFILE | LR_DEFAULTSIZE
+        )
+        hicon_small = user32.LoadImageW(
+            0, icon_path, IMAGE_ICON, 16, 16, LR_LOADFROMFILE
+        )
+
+        # 枚举顶层窗口，找标题匹配的
+        found = []
+
+        @ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+        def enum_proc(hwnd, lparam):
+            try:
+                length = user32.GetWindowTextLengthW(hwnd)
+                if length > 0:
+                    buf = ctypes.create_unicode_buffer(length + 1)
+                    user32.GetWindowTextW(hwnd, buf, length + 1)
+                    if title_part in buf.value:
+                        found.append(hwnd)
+            except Exception:
+                pass
+            return True
+
+        user32.EnumWindows(enum_proc, 0)
+
+        for hwnd in found:
+            if hicon_big:
+                user32.SendMessageW(hwnd, WM_SETICON, ICON_BIG, hicon_big)
+            if hicon_small:
+                user32.SendMessageW(hwnd, WM_SETICON, ICON_SMALL, hicon_small)
+    except Exception:
+        pass
+
+
 def main():
+    _set_app_user_model_id()
+
     api = Api()
     html = HERE / "ui" / "index.html"
 
@@ -209,7 +281,27 @@ def main():
     )
     api.bind(win)
 
-    webview.start(debug=False)
+    # 窗口出来后再强设一次图标（延迟 0.8 秒，等窗口真正创建完）
+    def _late_icon():
+        import time
+        time.sleep(0.8)
+        _force_window_icon()
+
+    threading.Thread(target=_late_icon, daemon=True).start()
+
+    # icon 参数只给 Windows（WinForms 后端只认 .ico）
+    kwargs = {"debug": False}
+    icon_path = HERE / "icon.ico"
+    if os.name == "nt" and icon_path.exists():
+        kwargs["icon"] = str(icon_path)
+
+    try:
+        webview.start(**kwargs)
+    except TypeError:
+        # 老版本 pywebview 不认 icon 参数
+        kwargs.pop("icon", None)
+        webview.start(**kwargs)
+
     return 0
 
 
