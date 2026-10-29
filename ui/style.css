@@ -1201,3 +1201,73 @@ html[data-theme="frost"] .bg-glow { opacity: .8; filter: blur(100px); }
   border-left: 2px solid var(--warn-a50, rgba(251,191,36,.5));
   padding-left: 32px;
 }
+
+/* ============ 一键更新按钮（醒目，比普通按钮更亮） ============ */
+.btn-go {
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-2, var(--accent)) 100%);
+  color: #04141a;
+  border: 1px solid var(--accent);
+  font-weight: 700;
+  box-shadow: 0 0 0 1px rgba(255,255,255,.08) inset, 0 4px 16px var(--accent-a30, rgba(34,211,238,.25));
+  animation: goPulse 2.2s ease-in-out infinite;
+}
+.btn-go:hover:not(:disabled) {
+  filter: brightness(1.12);
+  transform: translateY(-1px);
+}
+.btn-go:disabled { opacity: .45; animation: none; }
+@keyframes goPulse {
+  0%, 100% { box-shadow: 0 0 0 1px rgba(255,255,255,.08) inset, 0 4px 16px var(--accent-a30, rgba(34,211,238,.25)); }
+  50%      { box-shadow: 0 0 0 1px rgba(255,255,255,.12) inset, 0 4px 24px var(--accent-a50, rgba(34,211,238,.45)); }
+}
+
+/* ============ 添加插件表单 ============ */
+.add-form { padding: 4px 2px 8px; }
+.add-tip {
+  margin: 0 0 14px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--text-dim, #94a3b8);
+}
+.add-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 11px 14px;
+  font-size: 14px;
+  font-family: var(--mono, ui-monospace, monospace);
+  color: var(--text, #e2e8f0);
+  background: var(--input-bg, rgba(255,255,255,.04));
+  border: 1px solid var(--line, rgba(255,255,255,.12));
+  border-radius: 8px;
+  outline: none;
+  transition: border-color .15s, box-shadow .15s;
+}
+.add-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-a20, rgba(34,211,238,.15));
+}
+.add-hint {
+  min-height: 20px;
+  margin: 8px 0 0;
+  font-size: 12.5px;
+  color: var(--text-dim, #94a3b8);
+  line-height: 1.5;
+}
+.add-hint.good { color: #34d399; }
+.add-hint.warn { color: #fbbf24; }
+.add-row { display: flex; gap: 10px; margin-top: 16px; }
+.add-log {
+  margin: 16px 0 0;
+  padding: 12px 14px;
+  max-height: 260px;
+  overflow: auto;
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: 12px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  word-break: break-all;
+  color: var(--text-dim, #cbd5e1);
+  background: rgba(0,0,0,.28);
+  border: 1px solid var(--line, rgba(255,255,255,.1));
+  border-radius: 8px;
+}
