@@ -1,9 +1,9 @@
 # 插件管家 · Plugin Console
 
 > 给 [DeepSeek Harness](https://github.com/deepseek-ai)（DSH）用的插件管理器。
-> 检查更新、升级、卸载、回滚、分类查看，全都在这一个窗口里。
+> **打开就自动查更新，点一下全升完。**
 
-**为什么需要它**：DSH 的插件靠 pnpm 管理，命令行操作容易踩坑——「下载冷静期」会把新版本悄悄装成旧版、`pnpm add` 只写 `dependencies` 不写 `bundles`（装了看不见）、git 依赖会让整批安装回滚……这些坑一个脚本全填了。
+**为什么需要它**：DSH 的插件靠 pnpm 管理，命令行操作容易踩坑——「下载冷静期」会把新版本悄悄装成旧版、`pnpm add` 只写 `dependencies` 不写 `bundles`（装了看不见）、git 依赖会让整批安装回滚……这些坑一个窗口全填了。
 
 ---
 
@@ -11,8 +11,10 @@
 
 | 功能 | 说明 |
 |---|---|
-| **检查更新** | 逐个查云端最新版，标出「补丁级 / 功能级 / 大版本」 |
-| **一键升级** | 自动备份 → 摘出 git 依赖 → 装 → 校验 → 挂 bundles |
+| **打开即查** | 启动后自动扫描全部插件，不用点「检查更新」 |
+| **一键全升** | 可更新的排最上面，点「立即更新全部」一次升完，不用手动勾选 |
+| **逐个升级** | 想挑着升就勾选，按钮会变成「升级选中」 |
+| **添加插件** | 输入包名 → 自动查云端最新版 → 装 → 挂 bundles → 验证，全程界面内完成 |
 | **卸载** | `dependencies` + `bundles` + `node_modules` 三处一起清 |
 | **回滚** | 从历史备份恢复，当前状态自动另存 |
 | **插件一览** | 按 10 个分类分组，带中文说明，可搜索可折叠 |
@@ -22,35 +24,52 @@
 
 - **pnpm「下载冷静期」**：新版本不在 `minimumReleaseAgeExclude` 白名单里，pnpm 会**悄悄装成旧版**，exit 0 还不报错 → 自动写入白名单
 - **`pnpm add` 不写 `bundles`**：装完 `node_modules` 里有、DSH 里看不见 → 自动挂载
-- **git 依赖拖垮整批**：`pnpm add` 解析整棵依赖树会去 `git fetch`，连不上就 `ERR_PNPM_GIT_FETCH_FAILED` 整批回滚 → 临时摘出，装完放回
+- **git 依赖拖垮整批**：`pnpm add` 解析整棵依赖树会去 `git fetch`，连不上就整批回滚 → 临时摘出，装完放回
 - **DSH 运行中改 `node_modules`**：会把活进程搞崩 → 检测到运行中，所有写操作按钮直接变灰
 - **备份无限膨胀**：→ 每类最多留 3 份
 
 ---
 
-## 🚀 安装
+## 🚀 用
 
-### 需要
+### 方式一：下载 exe（推荐，不用装 Python）
 
-- Windows（用到了 `pythonw` 和系统 WebView）
-- Python 3.10+
-- `pip install pywebview`
+从 Releases 下载 `插件管家.zip`，解压后双击 `插件管家.exe`。
 
-### 用
+首次运行会在旁边生成 `config.json`，里面是自动探测到的路径。
+
+### 方式二：从源码跑
+
+需要 Python 3.10+ 和 `pywebview`：
 
 ```bat
-git clone <this-repo>
-cd plugin-console
+pip install pywebview
 copy config.example.json config.json
+启动插件管家.cmd
 ```
 
-双击 **`启动插件管家.cmd`**。首次运行会自动探测你的 DSH profile 并写进 `config.json`。
+---
+
+## 🏗 自己打包 exe
+
+```bat
+python build-exe.py
+```
+
+产物在 `dist\插件管家\`，整个文件夹拷走即可。
+
+> ⚠️ **打包目录必须是纯英文路径**（例如 `D:\PluginConsole-build`）。
+> 放在中文路径下打包，`pythonnet` 的 DLL 会加载失败，exe 一启动就退出。
+> 这是 PyInstaller + pythonnet 的已知限制，不是代码问题。
+
+> ⚠️ **必须用 `onedir` 模式**，不要 `onefile`。onefile 运行时要把自己解压到临时目录，某些机器上会报
+> `[PYI-ERROR] Could not create temporary directory` 直接退出。
 
 ---
 
 ## ⚙️ 配置
 
-`config.json`（从 `config.example.json` 复制）。**所有项写 `null` 都会自动探测**：
+`config.json`（首次运行自动生成，或从 `config.example.json` 复制）。**所有项写 `null` 都会自动探测**：
 
 | 项 | 说明 |
 |---|---|
@@ -74,16 +93,17 @@ copy config.example.json config.json
 ```
 plugin-console/
 ├── app.py              启动 + pywebview 桥接
-├── backend.py          核心：扫描 / 更新 / 卸载 / 回滚
+├── backend.py          核心：扫描 / 更新 / 卸载 / 回滚 / 查包 / 装包
 ├── paths.py            配置读取 + 路径自动探测
 ├── ledger.py           台账同步（可选，ledgerPath=null 时不启用）
 ├── categories.json     10 个分类规则（改这个就能改分类）
 ├── descriptions.json   插件中文说明词典（37 条）
 ├── config.example.json 配置模板
+├── build-exe.py        打包脚本（PyInstaller onedir）
+├── make_icon.py        图标生成（纯 Python 画，7 种尺寸）
 ├── ui/                 界面（HTML + CSS + JS）
 ├── icon.ico            图标
-├── make_icon.py        图标生成脚本（纯 Python 画，无依赖）
-└── 启动插件管家.cmd     双击启动
+└── 启动插件管家.cmd     从源码启动
 ```
 
 ---
