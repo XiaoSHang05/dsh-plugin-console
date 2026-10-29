@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-生成插件管家的 .ico（多尺寸，纯 Python 画，无外部依赖）
+生成插件管家图标（多尺寸，纯 Python，无依赖）
 
-★ 关键：Windows 资源管理器/任务栏会按需选尺寸。
-  只给一张 256x256 PNG 的 ICO，很多场景会显示成白纸（读不出来）。
-  必须打包 16/24/32/48/64/128/256 七种尺寸。
+设计要点（针对小尺寸优化）：
+  · 32px 下细描边会糊 → 改用「实心六边形环」，够粗够亮
+  · 圆底用深空渐变，六边形用青色渐变（外亮内暗，做出立体感）
+  · 中心亮点作为识别点
 """
 
 import struct
@@ -16,14 +17,14 @@ SIZES = [16, 24, 32, 48, 64, 128, 256]
 
 
 def draw(size):
-    """画一张 size x size 的 RGBA 图（返回 bytes）"""
     px = bytearray(size * size * 4)
     S = float(size)
     cx = cy = S / 2.0
+    rad = S * 0.5
 
-    R = S * 0.42
-    stroke_w = max(1.0, S * 0.055)
-    dot_r = S * 0.045
+    R_out = S * 0.40
+    R_in = R_out * (0.50 if size >= 32 else 0.42)
+    dot_r = S * (0.055 if size >= 32 else 0.075)
 
     def put(x, y, r, g, b, a):
         if not (0 <= x < size and 0 <= y < size):
@@ -40,14 +41,12 @@ def draw(size):
                 px[i + 2] = (b * a + px[i + 2] * oa * (255 - a) // 255) // na
                 px[i + 3] = na
 
-    def hex_sdf(x, y):
+    def hex_r(x, y):
         dx = abs(x - cx + 0.5)
         dy = abs(y - cy + 0.5)
         return max(dx * 0.8660254 + dy * 0.5, dy)
 
-    rad = S * 0.5
-
-    # ---- 背景
+    # ---- 圆底：深空渐变
     for y in range(size):
         for x in range(size):
             dx = x - cx + 0.5
@@ -55,28 +54,24 @@ def draw(size):
             if dx * dx + dy * dy > rad * rad:
                 continue
             t = y / S
-            put(x, y,
-                int(10 + (18 - 10) * t),
-                int(14 + (26 - 14) * t),
-                int(23 + (43 - 23) * t),
-                255)
+            put(x, y, int(8 + 10 * t), int(13 + 14 * t), int(22 + 22 * t), 255)
 
-    # ---- 六边形描边 + 内圈
-    inner_ring = R * 0.62
+    # ---- 实心六边形环
     for y in range(size):
         for x in range(size):
             dx = x - cx + 0.5
             dy = y - cy + 0.5
             if dx * dx + dy * dy > rad * rad:
                 continue
-            d = hex_sdf(x, y)
-            if abs(d - R) < stroke_w:
-                put(x, y, 94, 234, 212, 255)
-            elif abs(d - R) < stroke_w * 3.2:
-                k = 1.0 - abs(d - R) / (stroke_w * 3.2)
-                put(x, y, 34, 211, 238, int(90 * k * k))
-            elif size >= 32 and inner_ring - stroke_w * 0.35 < d < inner_ring + stroke_w * 0.35:
-                put(x, y, 34, 211, 238, 140)
+            d = hex_r(x, y)
+            if d > R_out or d < R_in:
+                continue
+            k = (d - R_in) / max(1e-6, R_out - R_in)
+            put(x, y,
+                int(94 + (165 - 94) * k),
+                int(234 + (243 - 234) * k),
+                int(212 + (252 - 212) * k),
+                255)
 
     # ---- 中心亮点
     for y in range(size):
@@ -85,10 +80,10 @@ def draw(size):
             dy = y - cy + 0.5
             dist = (dx * dx + dy * dy) ** 0.5
             if dist < dot_r:
-                put(x, y, 165, 243, 252, 255)
-            elif dist < dot_r * 2.4:
-                k = 1.0 - (dist - dot_r) / (dot_r * 1.4)
-                put(x, y, 34, 211, 238, int(160 * max(0.0, k) ** 2))
+                put(x, y, 186, 250, 255, 255)
+            elif dist < dot_r * 1.9 and size >= 32:
+                k = 1.0 - (dist - dot_r) / (dot_r * 0.9)
+                put(x, y, 94, 234, 212, int(150 * max(0.0, k) ** 2))
 
     return bytes(px)
 
@@ -110,33 +105,23 @@ def to_png(rgba, size):
     return png
 
 
-def build_ico():
-    pngs = []
-    for s in SIZES:
-        print(f"  画 {s}x{s}…")
-        pngs.append((s, to_png(draw(s), s)))
-
+def build():
+    pngs = [(s, to_png(draw(s), s)) for s in SIZES]
     header = struct.pack("<HHH", 0, 1, len(pngs))
     offset = 6 + 16 * len(pngs)
     entries = b""
     for s, data in pngs:
         w = 0 if s >= 256 else s
-        h = 0 if s >= 256 else s
-        entries += struct.pack("<BBBBHHII", w, h, 0, 0, 1, 32, len(data), offset)
+        entries += struct.pack("<BBBBHHII", w, w, 0, 0, 1, 32, len(data), offset)
         offset += len(data)
-
     return header + entries + b"".join(d for _, d in pngs)
 
 
 if __name__ == "__main__":
-    print(f"生成 {len(SIZES)} 个尺寸的 ICO…")
-    ico = build_ico()
+    ico = build()
     OUT.write_bytes(ico)
-    print(f"\n已写 {OUT}  ({len(ico)} bytes)")
-
-    d = OUT.read_bytes()
-    r, typ, cnt = struct.unpack("<HHH", d[:6])
-    print(f"校验：type={typ}（1=ICO） 尺寸数={cnt}")
-    for i in range(cnt):
-        w, h, c, res, planes, bpp, sz, off = struct.unpack("<BBBBHHII", d[6 + i * 16: 22 + i * 16])
-        print(f"  #{i+1}: {w or 256}x{h or 256}  {bpp}bpp  {sz}B")
+    print(f"已写 {OUT}  ({len(ico)} bytes, {len(SIZES)} 个尺寸)")
+    for s in (32, 256):
+        p = Path(__file__).parent / f"_prev_{s}.png"
+        p.write_bytes(to_png(draw(s), s))
+        print(f"预览: {p.name}")
