@@ -102,7 +102,7 @@ function setStatusChip(running, ver) {
 }
 
 function syncButtons() {
-  const ids = ['#btnScan', '#btnUpdate', '#btnUninstall', '#btnRollback'];
+  const ids = ['#btnScan', '#btnUpdate', '#btnUpdateAll', '#btnUninstall', '#btnRollback', '#btnAddPlugin'];
   if (!S.ready) { ids.forEach(s => { const e = $(s); if (e) e.disabled = true; }); return; }
 
   const canWrite = S.dshRunning === 0 && !S.busy;
@@ -110,13 +110,33 @@ function syncButtons() {
   const selUpd = [...S.selected].filter(n => upd.some(r => r.name === n));
 
   $('#btnScan').disabled = S.busy;
-  $('#btnUpdate').disabled = !canWrite || selUpd.length === 0;
+  $('#btnAddPlugin').disabled = S.busy;
+
+  // ★ 有可更新的 → 显示「立即更新全部」，并把「升级选中」藏起来（少一步操作）
+  const allBtn = $('#btnUpdateAll');
+  if (allBtn) {
+    const show = upd.length > 0;
+    allBtn.hidden = !show;
+    allBtn.disabled = !canWrite || !show;
+    const cnt = $('#allCount');
+    if (cnt) { cnt.hidden = !show; cnt.textContent = String(upd.length); }
+  }
+  // 只在用户手动改过勾选时才显示「升级选中」
+  const manual = selUpd.length > 0 && selUpd.length !== upd.length;
+  const upBtn = $('#btnUpdate');
+  if (upBtn) {
+    upBtn.hidden = !manual;
+    upBtn.disabled = !canWrite || selUpd.length === 0;
+  }
+
   $('#btnUninstall').disabled = !canWrite || S.selected.size === 0;
   $('#btnRollback').disabled = !canWrite;
 
   const badge = $('#selCount');
-  if (selUpd.length > 0) { badge.hidden = false; badge.textContent = String(selUpd.length); }
-  else badge.hidden = true;
+  if (badge) {
+    if (selUpd.length > 0) { badge.hidden = false; badge.textContent = String(selUpd.length); }
+    else badge.hidden = true;
+  }
 }
 
 function log(text) {
@@ -197,12 +217,24 @@ function rowDesc(r) {
   return `<div class="desc-main">${esc(d)}</div>${note}`;
 }
 
+const VERDICT_ORDER = { UPDATE: 0, SKIP: 1, ERR: 2, OK: 3, LOCAL: 4 };
+
+function sortRows(rows) {
+  // ★ 可更新的排最前（后端已排，这里再兜一次，防止后端没生效）
+  return [...rows].sort((a, b) => {
+    const da = VERDICT_ORDER[a.verdict] ?? 9;
+    const db = VERDICT_ORDER[b.verdict] ?? 9;
+    if (da !== db) return da - db;
+    return String(a.name).toLowerCase().localeCompare(String(b.name).toLowerCase());
+  });
+}
+
 function visibleRows() {
-  if (S.filter === 'all') return S.rows;
-  if (S.filter === 'update') return S.rows.filter(r => r.verdict === 'UPDATE');
-  if (S.filter === 'ok') return S.rows.filter(r => r.verdict === 'OK');
-  if (S.filter === 'local') return S.rows.filter(r => ['LOCAL', 'ERR', 'SKIP'].includes(r.verdict));
-  return S.rows;
+  if (S.filter === 'all') return sortRows(S.rows);
+  if (S.filter === 'update') return sortRows(S.rows.filter(r => r.verdict === 'UPDATE'));
+  if (S.filter === 'ok') return sortRows(S.rows.filter(r => r.verdict === 'OK'));
+  if (S.filter === 'local') return sortRows(S.rows.filter(r => ['LOCAL', 'ERR', 'SKIP'].includes(r.verdict)));
+  return sortRows(S.rows);
 }
 
 function render() {
@@ -454,6 +486,138 @@ async function doScan() {
   }
 }
 
+// ★ 一键更新全部：不用先全选，直接把所有可更新的升掉
+async function doUpdateAll() {
+  const names = sortRows(S.rows).filter(r => r.verdict === 'UPDATE').map(r => r.name);
+  if (!names.length || !api()) return;
+  if (S.dshRunning > 0) { alert('DSH 正在运行，先把 DSH 彻底退出再更新。'); return; }
+
+  if (!confirm(`要升级全部 ${names.length} 个可更新的插件吗？\n\n${names.join('\n')}\n\n升级前会自动备份。`)) return;
+
+  S.busy = true; syncButtons(); openLog(); clearLog();
+  log(`开始升级 ${names.length} 个插件…`);
+  progress(true, 0, '准备…');
+
+  try {
+    const r = await api().update(names);
+    progress(false);
+    if (!r || r.error) { log('✗ ' + ((r && r.error) || '未知错误')); return; }
+
+    log('');
+    log('──────── 结果 ────────');
+    for (const x of r.results || []) {
+      log(`${x.ok ? '✓' : '✗'} ${x.name}　${x.from || '?'} → ${x.to || '读不到'}`);
+    }
+    if (r.mounted && r.mounted.length) log(`已挂进 bundles：${r.mounted.join(', ')}`);
+
+    if (r.notes && r.notes.length) {
+      log('');
+      log('──────── 这次更新了什么 ────────');
+      for (const n of r.notes) {
+        log(`${n.name}　${n.from} → ${n.to}`);
+        if (n.jump) log(`  【${n.jump.label}】${n.jump.hint}`);
+        if (n.changelog && n.changelog.length) {
+          for (const b of n.changelog) log(`  · ${b}`);
+        }
+      }
+    }
+    log('');
+    log(r.ok ? '✓ 全部成功。重新打开 DSH 生效。' : '有些没到位，看上面标 ✗ 的。');
+    S.selected.clear();
+    await doScan();
+  } catch (e) {
+    log('升级异常：' + e.message);
+  } finally {
+    S.busy = false; syncButtons();
+  }
+}
+
+// ★ 添加插件
+function openAddPlugin() {
+  const box = $('#modalBody');
+  $('#modalMask').hidden = false;
+  box.innerHTML = `
+    <div class="add-form">
+      <p class="add-tip">输入 npm 包名，回车即安装。装完会自动挂进 bundles 并验证。</p>
+      <input id="addName" class="add-input" placeholder="例如 dsh-prompt-history" autocomplete="off" spellcheck="false">
+      <div id="addVer" class="add-hint"></div>
+      <div class="add-row">
+        <button class="btn btn-primary" id="addGo">开始安装</button>
+        <button class="btn btn-ghost" id="addCancel">取消</button>
+      </div>
+      <pre id="addLog" class="add-log" hidden></pre>
+    </div>`;
+
+  const input = $('#addName');
+  const hint = $('#addVer');
+  const goBtn = $('#addGo');
+  const logBox = $('#addLog');
+  input.focus();
+
+  const write = (s) => {
+    logBox.hidden = false;
+    logBox.textContent += s + '\n';
+    logBox.scrollTop = logBox.scrollHeight;
+  };
+
+  // 输入停顿后查这个包存在不存在
+  let timer = null;
+  input.oninput = () => {
+    clearTimeout(timer);
+    const v = input.value.trim();
+    hint.textContent = '';
+    if (!v) return;
+    timer = setTimeout(async () => {
+      hint.textContent = '查询中…';
+      try {
+        const r = await api().probe_package(v);
+        if (r && r.ok) {
+          hint.textContent = `云端最新版：${r.latest}` + (r.hasBundle ? '　·　是 DSH 插件 ✓' : '　·　⚠ 没有 dsh.bundle，可能不是 DSH 插件');
+          hint.className = 'add-hint ' + (r.hasBundle ? 'good' : 'warn');
+        } else {
+          hint.textContent = '没找到这个包';
+          hint.className = 'add-hint warn';
+        }
+      } catch { hint.textContent = ''; }
+    }, 500);
+  };
+
+  $('#addCancel').onclick = () => { $('#modalMask').hidden = true; };
+
+  const run = async () => {
+    const name = input.value.trim();
+    if (!name) { input.focus(); return; }
+    if (S.dshRunning > 0) { write('✗ DSH 正在运行，先把 DSH 彻底退出再装。'); return; }
+
+    goBtn.disabled = true;
+    input.disabled = true;
+    logBox.hidden = false;
+    logBox.textContent = '';
+    write(`开始安装 ${name} …`);
+
+    try {
+      const r = await api().install_package(name);
+      for (const line of (r && r.log) || []) write(line);
+      write('');
+      if (r && r.ok) {
+        write('✓ 装好了。重新打开 DSH 生效。');
+        goBtn.textContent = '完成';
+        goBtn.disabled = false;
+        goBtn.onclick = () => { $('#modalMask').hidden = true; doScan(); };
+      } else {
+        write('✗ ' + ((r && r.error) || '失败，看上面日志'));
+        goBtn.disabled = false;
+      }
+    } catch (e) {
+      write('异常：' + e.message);
+      goBtn.disabled = false;
+    }
+  };
+
+  goBtn.onclick = run;
+  input.onkeydown = (e) => { if (e.key === 'Enter') run(); };
+}
+
 async function doUpdate() {
   const upd = S.rows.filter(r => r.verdict === 'UPDATE').map(r => r.name);
   const names = [...S.selected].filter(n => upd.includes(n));
@@ -585,7 +749,9 @@ function switchTab(name) {
 function bind() {
   $('#btnScan').onclick = doScan;
   $('#btnUpdate').onclick = doUpdate;
+  $('#btnUpdateAll').onclick = doUpdateAll;
   $('#btnUninstall').onclick = doUninstall;
+  $('#btnAddPlugin').onclick = openAddPlugin;
   $('#btnRollback').onclick = openRollback;
 
   $('#btnTheme').onclick = () => { renderThemeGrid(); $('#themeMask').hidden = false; };
@@ -680,6 +846,9 @@ async function boot() {
   }
 
   syncButtons();
+
+  // ★ 自动检查更新：打开程序就开始扫，不用手动点「检查更新」
+  setTimeout(() => { if (!S.busy && S.rows.length === 0) doScan(); }, 400);
 
   setInterval(async () => {
     if (!api() || S.busy) return;
