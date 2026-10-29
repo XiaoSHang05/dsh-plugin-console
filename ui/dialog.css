@@ -1,0 +1,163 @@
+/* ===================================================================
+   对话框（替换原生 confirm / alert）
+   深空玻璃质感，跟界面同主题
+   =================================================================== */
+
+.dlg-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(4, 8, 14, .62);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  animation: dlgFadeIn .16s ease-out;
+}
+.dlg-mask[hidden] { display: none; }
+
+@keyframes dlgFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.dlg {
+  width: 460px;
+  max-width: calc(100vw - 48px);
+  max-height: calc(100vh - 80px);
+  display: flex;
+  flex-direction: column;
+  background: var(--panel, #0f1621);
+  border: 1px solid var(--line-strong, rgba(120, 200, 230, .28));
+  border-radius: 14px;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, .04) inset,
+    0 24px 64px rgba(0, 0, 0, .55),
+    0 0 40px var(--accent-a20, rgba(34, 211, 238, .14));
+  overflow: hidden;
+  animation: dlgPop .2s cubic-bezier(.2, .9, .3, 1.2);
+}
+
+@keyframes dlgPop {
+  from { opacity: 0; transform: translateY(10px) scale(.97); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* ---- 头部：图标 + 标题 */
+.dlg-h {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 20px 22px 0;
+}
+.dlg-ico {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  background: var(--accent-a15, rgba(34, 211, 238, .12));
+  border: 1px solid var(--accent-a30, rgba(34, 211, 238, .26));
+  color: var(--accent, #22d3ee);
+}
+.dlg-ico svg { width: 17px; height: 17px; }
+.dlg-ico.warn {
+  background: rgba(251, 191, 36, .12);
+  border-color: rgba(251, 191, 36, .3);
+  color: #fbbf24;
+}
+.dlg-ico.bad {
+  background: rgba(248, 113, 113, .12);
+  border-color: rgba(248, 113, 113, .3);
+  color: #f87171;
+}
+.dlg-title {
+  font-size: 15.5px;
+  font-weight: 650;
+  color: var(--text, #e6edf6);
+  letter-spacing: .2px;
+}
+
+/* ---- 内容 */
+.dlg-b {
+  padding: 12px 22px 4px;
+  overflow-y: auto;
+  min-height: 0;
+}
+.dlg-msg {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.75;
+  color: var(--text-dim, #9fb0c4);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* 列表块（要操作的插件名） */
+.dlg-list {
+  margin: 14px 0 4px;
+  padding: 10px 12px;
+  max-height: 190px;
+  overflow-y: auto;
+  background: rgba(0, 0, 0, .3);
+  border: 1px solid var(--line, rgba(255, 255, 255, .09));
+  border-radius: 9px;
+}
+.dlg-list-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: 12.5px;
+  color: var(--text, #dbe6f2);
+}
+.dlg-list-item::before {
+  content: "";
+  flex: none;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent, #22d3ee);
+  box-shadow: 0 0 6px var(--accent-a50, rgba(34, 211, 238, .5));
+}
+.dlg-list-item .ver {
+  color: var(--text-faint, #6b7f95);
+  font-size: 11.5px;
+}
+
+/* 备注行（升级前会自动备份） */
+.dlg-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 9px 12px;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--text-dim, #9fb0c4);
+  background: var(--accent-a08, rgba(34, 211, 238, .07));
+  border-left: 2px solid var(--accent, #22d3ee);
+  border-radius: 0 7px 7px 0;
+}
+.dlg-note svg { flex: none; width: 13px; height: 13px; margin-top: 2px; color: var(--accent, #22d3ee); }
+
+/* ---- 底部按钮 */
+.dlg-f {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 18px 22px 20px;
+}
+.dlg-f .btn {
+  min-width: 84px;
+  justify-content: center;
+  height: 36px;
+  font-size: 13.5px;
+}
+.dlg-f .btn-primary,
+.dlg-f .btn-go {
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, .07) inset, 0 4px 16px var(--accent-a30, rgba(34, 211, 238, .22));
+}
