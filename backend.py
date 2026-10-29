@@ -418,6 +418,11 @@ def scan_all(on_progress=None):
             "jumpHint": jump["hint"] if jump else "",
         })
 
+    # ★ 排序：可更新的排最前（宴城 2026-10-29 要求）
+    #   优先级：UPDATE > SKIP > ERR > OK > LOCAL
+    _order = {"UPDATE": 0, "SKIP": 1, "ERR": 2, "OK": 3, "LOCAL": 4}
+    rows.sort(key=lambda r: (_order.get(r["verdict"], 9), r["name"].lower()))
+
     return {"rows": rows, "dshRunning": running, "dshVer": dsh_ver,
             "root": str(root) if root else None}
 
