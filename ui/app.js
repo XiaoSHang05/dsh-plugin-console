@@ -490,9 +490,23 @@ async function doScan() {
 async function doUpdateAll() {
   const names = sortRows(S.rows).filter(r => r.verdict === 'UPDATE').map(r => r.name);
   if (!names.length || !api()) return;
-  if (S.dshRunning > 0) { alert('DSH 正在运行，先把 DSH 彻底退出再更新。'); return; }
+  if (S.dshRunning > 0) {
+    await pmAlert({ title: '现在不能更新', kind: 'warn', icon: 'warn',
+      message: 'DSH 正在运行（' + S.dshRunning + ' 个进程），现在改 node_modules 会把活进程搞崩。请先彻底退出 DSH（托盘图标右键 → 退出），再回来更新。' });
+    return;
+  }
 
-  if (!confirm(`要升级全部 ${names.length} 个可更新的插件吗？\n\n${names.join('\n')}\n\n升级前会自动备份。`)) return;
+  const itemsAll = names.map(n => {
+    const row = S.rows.find(r => r.name === n);
+    return { name: n, ver: row ? (row.ver + ' → ' + (row.latest || '')) : '' };
+  });
+  if (!await pmConfirm({
+    title: '升级全部 ' + names.length + ' 个插件',
+    icon: 'upd',
+    items: itemsAll,
+    note: '升级前会自动备份 package.json / lock 文件，出问题可以回滚。',
+    okText: '开始升级'
+  })) return;
 
   S.busy = true; syncButtons(); openLog(); clearLog();
   log(`开始升级 ${names.length} 个插件…`);
@@ -622,7 +636,17 @@ async function doUpdate() {
   const upd = S.rows.filter(r => r.verdict === 'UPDATE').map(r => r.name);
   const names = [...S.selected].filter(n => upd.includes(n));
   if (!names.length || !api()) return;
-  if (!confirm(`要升级这 ${names.length} 个插件吗？\n\n${names.join('\n')}\n\n升级前会自动备份。`)) return;
+  const itemsSel = names.map(n => {
+    const row = S.rows.find(r => r.name === n);
+    return { name: n, ver: row ? (row.ver + ' → ' + (row.latest || '')) : '' };
+  });
+  if (!await pmConfirm({
+    title: '升级选中的 ' + names.length + ' 个插件',
+    icon: 'upd',
+    items: itemsSel,
+    note: '升级前会自动备份，出问题可以回滚。',
+    okText: '开始升级'
+  })) return;
 
   S.busy = true; syncButtons(); openLog(); clearLog();
   log(`开始升级 ${names.length} 个插件…`);
@@ -668,7 +692,15 @@ async function doUpdate() {
 async function doUninstall() {
   const names = [...S.selected];
   if (!names.length || !api()) return;
-  if (!confirm(`要卸载这 ${names.length} 个插件吗？\n\n${names.join('\n')}\n\n会同时从 dependencies 和 bundles 里移除。`)) return;
+  if (!await pmConfirm({
+    title: '卸载 ' + names.length + ' 个插件',
+    kind: 'bad',
+    icon: 'trash',
+    danger: true,
+    items: names,
+    note: '会同时从 dependencies 和 bundles 里移除。卸载前会自动备份。',
+    okText: '确认卸载'
+  })) return;
 
   S.busy = true; syncButtons(); openLog(); clearLog();
   log(`开始卸载 ${names.length} 个插件…`);
@@ -712,7 +744,13 @@ async function openRollback() {
     body.querySelectorAll('.bk-item').forEach(el => {
       el.addEventListener('click', async () => {
         const id = el.dataset.id;
-        if (!confirm(`要回滚到 ${id} 这一版吗？\n\n当前状态会先另存一份，回滚错了还能再回来。\n\n会重装依赖，需要一两分钟。`)) return;
+        if (!await pmConfirm({
+          title: '回滚到旧版本',
+          icon: 'back',
+          message: '备份点：' + id,
+          note: '当前状态会先另存一份，回滚错了还能再回来。会重装依赖，需要一两分钟。',
+          okText: '开始回滚'
+        })) return;
         $('#modalMask').hidden = true;
         S.busy = true; syncButtons(); openLog(); clearLog();
         progress(true, 40, '正在恢复并重装…');
