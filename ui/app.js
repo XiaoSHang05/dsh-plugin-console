@@ -538,6 +538,9 @@ async function doUpdateAll() {
     log('');
     log(r.ok ? '✓ 全部成功。重新打开 DSH 生效。' : '有些没到位，看上面标 ✗ 的。');
     S.selected.clear();
+    // ★ 必须先清 busy 再扫，否则 doScan 第一行的 `if (S.busy) return` 会直接跳过，
+    //   界面就停在旧数据上，看起来像「更新完了还说有更新」。
+    S.busy = false;
     await doScan();
   } catch (e) {
     log('升级异常：' + e.message);
@@ -680,6 +683,7 @@ async function doUpdate() {
     log('');
     log(r.ok ? '✓ 全部成功。重新打开 DSH 生效。' : '有些没到位，看上面标 ✗ 的。');
     S.selected.clear();
+    S.busy = false;              // ★ 先清 busy，否则下面的 doScan 会被自身守卫跳过
     await doScan();
     await loadInstalled();
   } catch (e) {
@@ -720,6 +724,7 @@ async function doUninstall() {
     log('');
     log(r.ok ? '✓ 卸载干净。重新打开 DSH 生效。' : '有残留，看上面标 ✗ 的。');
     S.selected.clear();
+    S.busy = false;              // ★ 先清 busy，否则 doScan 会被自身守卫跳过
     await doScan();
     await loadInstalled();
   } catch (e) {
@@ -758,6 +763,7 @@ async function openRollback() {
           const r = await api().rollback(id);
           progress(false);
           log(r && r.ok ? '✓ 回滚完成。重新打开 DSH 生效。' : `✗ 回滚失败：${(r && r.error) || ('exit ' + (r && r.code))}`);
+          S.busy = false;      // ★ 先清 busy，否则 doScan 会被自身守卫跳过
           await doScan();
           await loadInstalled();
         } catch (e) { log('回滚异常：' + e.message); progress(false); }
