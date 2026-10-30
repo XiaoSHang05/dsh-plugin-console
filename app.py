@@ -161,6 +161,33 @@ class Api:
         except Exception as e:
             return {"ok": False, "error": str(e)}
 
+    # ---------------- 保护机制
+    def protect_info(self):
+        try:
+            return {
+                "ok": True,
+                "pinned": backend.list_pinned(),
+                "protected": backend.list_protected(),
+                "verify": backend.protect_verify(),
+                "configFile": str(backend.PROTECT_FILE),
+            }
+        except Exception as e:
+            traceback.print_exc()
+            return {"ok": False, "error": str(e)}
+
+    def protect_open_config(self):
+        try:
+            os.startfile(str(backend.PROTECT_FILE))
+            return {"ok": True}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    def protect_snapshot_now(self):
+        try:
+            return backend.protect_snapshot()
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
     # ---------------- 添加插件：查包 / 装包
     def probe_package(self, name):
         try:
