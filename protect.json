@@ -1,0 +1,19 @@
+{
+  "_说明": "插件保护配置。放在这里的插件，升级时不会被主动改动，本地修改也会被自动备份/还原。",
+
+  "pinned": [
+    "dsh-dock"
+  ],
+  "_pinned说明": "钉住的插件：不出现在可更新列表，不会被主动升级。但升级别的包时 pnpm 仍可能顺带重装它 —— 所以还要配下面的 protected。",
+
+  "protected": {
+    "dsh-dock": {
+      "files": [
+        "client.js",
+        "features/notify/view.jsx"
+      ],
+      "note": "本地加了「提醒自动消退」功能，不能被官方版覆盖"
+    }
+  },
+  "_protected说明": "受保护的文件（相对插件目录）。每次升级前自动备份到 _backups/local/<时间戳>/，升级后自动还原回 node_modules。"
+}
