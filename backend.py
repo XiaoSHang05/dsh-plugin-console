@@ -455,10 +455,136 @@ def scan_all(on_progress=None):
     # ★ 排序：可更新的排最前（宴城 2026-10-29 要求）
     #   优先级：UPDATE > SKIP > ERR > OK > LOCAL
     _order = {"UPDATE": 0, "SKIP": 1, "ERR": 2, "OK": 3, "LOCAL": 4}
+
+    # ★ C 方案：钉住的包即使有新版也不标 UPDATE（不主动升）
+    _pinned = set(list_pinned())
+    for r in rows:
+        if r["name"] in _pinned and r["verdict"] == "UPDATE":
+            r["verdict"] = "SKIP"
+            r["pinned"] = True
+            r["pinHint"] = "已钉住，不主动升级"
+
     rows.sort(key=lambda r: (_order.get(r["verdict"], 9), r["name"].lower()))
 
     return {"rows": rows, "dshRunning": running, "dshVer": dsh_ver,
             "root": str(root) if root else None}
+
+
+# ---------------------------------------------------------------- 保护机制
+#  A：本地修改保护（升级前备份 → 升级后还原）
+#  C：钉住（不主动升级）
+PROTECT_FILE = Path(__file__).parent / "protect.json"
+LOCAL_BACKUP = "local"
+
+
+def _protect_cfg():
+    try:
+        if PROTECT_FILE.exists():
+            return json.loads(PROTECT_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        pass
+    return {}
+
+
+def list_pinned():
+    """C 方案：被钉住的插件名"""
+    v = _protect_cfg().get("pinned") or []
+    return [str(x) for x in v if x]
+
+
+def is_pinned(name):
+    return name in list_pinned()
+
+
+def list_protected():
+    """A 方案：{包名: {files: [...], note: str}}"""
+    d = _protect_cfg().get("protected") or {}
+    return d if isinstance(d, dict) else {}
+
+
+def protect_backup_dir(ts):
+    return BACKUP_ROOT / LOCAL_BACKUP / ts
+
+
+def protect_snapshot(names=None):
+    """升级前：把受保护包的改动文件备份出来
+    names=None 表示备份 protect.json 里全部
+    返回 {ok, ts, count, files: [...]}"""
+    cfg = list_protected()
+    if not cfg:
+        return {"ok": True, "ts": None, "count": 0, "files": [], "note": "没有受保护的插件"}
+
+    targets = list(cfg.keys()) if names is None else [n for n in names if n in cfg]
+    if not targets:
+        return {"ok": True, "ts": None, "count": 0, "files": [], "note": "没有匹配的受保护插件"}
+
+    ts = datetime.now().strftime("%Y%m%d-%H%M%S")
+    dest = protect_backup_dir(ts)
+    saved = []
+    missing = []
+    try:
+        for pkg in targets:
+            files = (cfg.get(pkg) or {}).get("files") or []
+            for rel in files:
+                src = PROFILE / "node_modules" / pkg / rel
+                if not src.exists():
+                    missing.append(f"{pkg}/{rel}")
+                    continue
+                out = dest / pkg / rel
+                out.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(src, out)
+                saved.append(f"{pkg}/{rel}")
+    except Exception as e:
+        return {"ok": False, "error": str(e), "ts": ts, "count": len(saved), "files": saved}
+
+    return {"ok": True, "ts": ts, "count": len(saved),
+            "files": saved, "missing": missing, "dir": str(dest)}
+
+
+def protect_restore(ts):
+    """升级后：把备份的改动文件还原回 node_modules
+    返回 {ok, restored, files}"""
+    if not ts:
+        return {"ok": True, "restored": 0, "files": [], "note": "没有快照可还原"}
+    src_root = protect_backup_dir(ts)
+    if not src_root.exists():
+        return {"ok": False, "error": "备份不存在：%s" % src_root,
+                "restored": 0, "files": []}
+
+    restored = []
+    failed = []
+    try:
+        for f in src_root.rglob("*"):
+            if not f.is_file():
+                continue
+            rel = f.relative_to(src_root)          # <pkg>/<相对路径>
+            dst = PROFILE / "node_modules" / rel
+            try:
+                dst.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(f, dst)
+                restored.append(str(rel).replace("\\", "/"))
+            except Exception as e:
+                failed.append(f"{rel}: {e}")
+    except Exception as e:
+        return {"ok": False, "error": str(e), "restored": len(restored), "files": restored}
+
+    return {"ok": len(failed) == 0, "restored": len(restored),
+            "files": restored, "failed": failed}
+
+
+def protect_verify():
+    """检查受保护文件现在还在不在（升级后自查用）"""
+    cfg = list_protected()
+    out = {}
+    for pkg, info in cfg.items():
+        files = (info or {}).get("files") or []
+        exist = []
+        miss = []
+        for rel in files:
+            p = PROFILE / "node_modules" / pkg / rel
+            (exist if p.exists() else miss).append(rel)
+        out[pkg] = {"ok": not miss, "exist": exist, "missing": miss}
+    return out
 
 
 # ---------------------------------------------------------------- 备份
@@ -902,6 +1028,17 @@ def dedupe_whitelist(on_log=None):
 
 # ---------------------------------------------------------------- 对外 API
 def do_update(names, on_log, on_progress=None):
+    # ★ C 方案优先：钉住的包直接拒，连"DSH 在运行"都不用问
+    pinned_requested = [n for n in (names or []) if is_pinned(n)]
+    names = [n for n in (names or []) if not is_pinned(n)]
+
+    if not names:
+        if pinned_requested:
+            return {"ok": False,
+                    "error": "这些都钉住了，不主动升级：%s" % ", ".join(pinned_requested),
+                    "pinned": pinned_requested}
+        return {"ok": False, "error": "没有可更新的目标"}
+
     if dsh_process_count() > 0:
         return {"ok": False, "error": "DSH 正在运行，不能更新"}
 
@@ -910,8 +1047,22 @@ def do_update(names, on_log, on_progress=None):
     if not targets:
         return {"ok": False, "error": "没有可更新的目标"}
 
+    if pinned_requested:
+        on_log("已跳过钉住的插件（pinned）：%s" % ", ".join(pinned_requested))
+
     backup_dir = make_backup("update")
     on_log(f"已备份到 {backup_dir}")
+
+    # ---- A 方案：升级前把本地改动备份出来（不管这次升什么，都保护一遍）
+    snap = protect_snapshot()
+    if snap.get("count"):
+        on_log("已备份 %d 个本地改动文件 → %s" % (snap["count"], snap["dir"]))
+        for f in snap.get("files") or []:
+            on_log("  · %s" % f)
+        if snap.get("missing"):
+            on_log("  （这些文件没找到，跳过：%s）" % ", ".join(snap["missing"]))
+    elif snap.get("ok"):
+        on_log("没有需要保护的本地改动")
 
     parked, restore = park_non_registry()
     if parked:
@@ -933,6 +1084,21 @@ def do_update(names, on_log, on_progress=None):
     restore()
     if parked:
         on_log(f"已把 {parked} 个本地/git 依赖放回")
+
+    # ---- A 方案：升级完把本地改动还原回去（pnpm 可能顺带覆盖了别的包）
+    if snap.get("ts"):
+        rr = protect_restore(snap["ts"])
+        if rr.get("restored"):
+            on_log("已还原 %d 个本地改动文件（防止被 pnpm 顺带覆盖）" % rr["restored"])
+            for f in rr.get("files") or []:
+                on_log("  ↩ %s" % f)
+        if rr.get("failed"):
+            on_log("✗ 这些没还原成功：%s" % "; ".join(rr["failed"]))
+        # 自查
+        chk = protect_verify()
+        for pkg, info in chk.items():
+            if not info["ok"]:
+                on_log("✗ %s 缺少文件：%s" % (pkg, ", ".join(info["missing"])))
 
     added = mount_bundles([t["name"] for t in targets], on_log)
 
