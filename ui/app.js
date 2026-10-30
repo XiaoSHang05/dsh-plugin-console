@@ -552,6 +552,8 @@ async function doUpdateAll() {
 // ★ 添加插件
 function openAddPlugin() {
   const box = $('#modalBody');
+  const title = $('#modalTitle');
+  if (title) title.textContent = '添加插件';
   $('#modalMask').hidden = false;
   box.innerHTML = `
     <div class="add-form">
@@ -633,6 +635,93 @@ function openAddPlugin() {
 
   goBtn.onclick = run;
   input.onkeydown = (e) => { if (e.key === 'Enter') run(); };
+}
+
+// ★ 保护面板：本地改动不让升级覆盖
+async function openProtect() {
+  const box = $('#modalBody');
+  const title = $('#modalTitle');
+  if (title) title.textContent = '保护本地改动';
+  $('#modalMask').hidden = false;
+  box.innerHTML = '<div class="add-tip">读取中…</div>';
+
+  let info;
+  try {
+    info = await api().protect_info();
+  } catch (e) {
+    box.innerHTML = '<div class="add-tip">读取失败：' + e.message + '</div>';
+    return;
+  }
+  if (!info || !info.ok) {
+    box.innerHTML = '<div class="add-tip">读取失败：' + ((info && info.error) || '未知') + '</div>';
+    return;
+  }
+
+  const pinned = info.pinned || [];
+  const prot = info.protected || {};
+  const verify = info.verify || {};
+
+  const pinnedHtml = pinned.length
+    ? pinned.map(n => `<span class="pin-tag">${n}</span>`).join('')
+    : '<span class="add-tip">（没有钉住的插件）</span>';
+
+  const protRows = Object.keys(prot).map(pkg => {
+    const p = prot[pkg] || {};
+    const files = p.files || [];
+    const ok = verify[pkg] && verify[pkg].ok;
+    const badge = ok
+      ? '<span class="ok-tag">文件都在</span>'
+      : '<span class="bad-tag">有文件缺失</span>';
+    const fileList = files.map(f => {
+      const miss = verify[pkg] && (verify[pkg].missing || []).includes(f);
+      return `<div class="pro-file ${miss ? 'miss' : ''}">${miss ? '✗' : '✓'} ${f}</div>`;
+    }).join('');
+    return `<div class="pro-item">
+      <div class="pro-head"><b>${pkg}</b> ${badge}</div>
+      <div class="pro-note">${p.note || ''}</div>
+      ${fileList}
+    </div>`;
+  }).join('');
+
+  box.innerHTML = `
+    <div class="add-form">
+      <p class="add-tip">这里的插件不会被主动升级，本地改动在升级任何包之前都会自动备份、升级后自动还原。</p>
+
+      <div class="pro-section">
+        <div class="pro-title">🔒 钉住的插件（不主动升级）</div>
+        <div class="pin-list">${pinnedHtml}</div>
+      </div>
+
+      <div class="pro-section">
+        <div class="pro-title">🛡 受保护的文件</div>
+        ${protRows || '<div class="add-tip">（没有受保护的文件）</div>'}
+      </div>
+
+      <div class="add-row">
+        <button class="btn btn-primary" id="proSnapshot">立即备份一次</button>
+        <button class="btn btn-ghost" id="proConfig">打开配置</button>
+        <button class="btn btn-ghost" id="proClose">关闭</button>
+      </div>
+      <pre id="proLog" class="add-log" hidden></pre>
+    </div>`;
+
+  $('#proClose').onclick = () => { $('#modalMask').hidden = true; };
+  $('#proConfig').onclick = () => { api().protect_open_config(); };
+  $('#proSnapshot').onclick = async () => {
+    const lg = $('#proLog');
+    lg.hidden = false;
+    lg.textContent = '备份中…\n';
+    try {
+      const r = await api().protect_snapshot_now();
+      if (r && r.ok) {
+        lg.textContent += `✓ 备份了 ${r.count} 个文件\n${(r.files || []).join('\n')}\n\n目录：${r.dir || ''}`;
+      } else {
+        lg.textContent += '✗ ' + ((r && r.error) || '失败');
+      }
+    } catch (e) {
+      lg.textContent += '异常：' + e.message;
+    }
+  };
 }
 
 async function doUpdate() {
@@ -796,6 +885,7 @@ function bind() {
   $('#btnUpdateAll').onclick = doUpdateAll;
   $('#btnUninstall').onclick = doUninstall;
   $('#btnAddPlugin').onclick = openAddPlugin;
+  $('#btnProtect').onclick = openProtect;
   $('#btnRollback').onclick = openRollback;
 
   $('#btnTheme').onclick = () => { renderThemeGrid(); $('#themeMask').hidden = false; };
